@@ -1,0 +1,47 @@
+@import "tailwindcss";
+
+@theme {
+  /* VS Code Dark Theme Colors */
+  --color-gray-950: #181818;
+  --color-gray-900: #1e1e1e; /* Editor BG */
+  --color-gray-850: #1f1f1f;
+  --color-gray-800: #252526; /* Sidebar BG */
+  --color-gray-750: #2d2d2d;
+  --color-gray-700: #333333; /* Activity Bar? Or Border? 3e3e42 is border usually */
+  --color-gray-600: #3e3e42; /* Borders */
+  --color-gray-500: #555555;
+  --color-gray-400: #858585;
+  --color-gray-300: #cccccc; /* Text Main */
+  --color-gray-200: #eeeeee;
+  --color-gray-100: #f3f3f3;
+  --color-gray-50: #ffffff;
+
+  /* VS Code Blue Accent */
+  --color-indigo-500: #0e639c;
+  --color-indigo-600: #007fd4;
+}
+
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+    margin: 0;
+    overflow: hidden; /* Prevent window-level scrolling */
+    @apply bg-gray-100 dark:bg-gray-900;
+  }
+
+  body {
+    @apply text-gray-900 dark:text-gray-100;
+  }
+}
+
+@layer utilities {
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+}
