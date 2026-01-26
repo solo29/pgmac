@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef, useEffect, useCallback } from "react";
+import { useState, useMemo, useRef, useEffect, useCallback, memo } from "react";
 import { Trash2 } from "lucide-react";
 import { useReactTable, getCoreRowModel, flexRender, ColumnDef } from "@tanstack/react-table";
 import { useVirtualizer } from "@tanstack/react-virtual";
@@ -19,7 +19,16 @@ interface ResultsTableProps {
   executionDurationMs?: number;
 }
 
-export function ResultsTable({ data, error, isLoading, tableName, columnDefs, onUpdateCell, onDeleteRow, executionDurationMs }: ResultsTableProps) {
+export const ResultsTable = memo(function ResultsTable({
+  data,
+  error,
+  isLoading,
+  tableName,
+  columnDefs,
+  onUpdateCell,
+  onDeleteRow,
+  executionDurationMs,
+}: ResultsTableProps) {
   const [modalData, setModalData] = useState<{ value: any; row: any[]; colIdx: number } | null>(null);
   const [columnWidths, setColumnWidths] = useState<Record<string, number>>({});
   const [isResizing, setIsResizing] = useState<string | null>(null);
@@ -111,9 +120,9 @@ export function ResultsTable({ data, error, isLoading, tableName, columnDefs, on
   const MIN_WIDTH = 50;
 
   // Get width for a column
-  // We use the unique column ID (name_index) for storage if possible, 
-  // currently `columnWidths` keyed by string. 
-  // Existing keys might be just names. 
+  // We use the unique column ID (name_index) for storage if possible,
+  // currently `columnWidths` keyed by string.
+  // Existing keys might be just names.
   // For duplicates, they might share width settings if we use name, or split if we use unique ID.
   // Let's use unique ID to prevent glitches.
   const getColumnWidth = useCallback(
@@ -220,11 +229,7 @@ export function ResultsTable({ data, error, isLoading, tableName, columnDefs, on
     <>
       <div className="h-full w-full flex flex-col overflow-hidden">
         {/* Fixed Header */}
-        <div
-          ref={headerScrollRef}
-          className="flex-shrink-0 overflow-hidden"
-          style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
-        >
+        <div ref={headerScrollRef} className="flex-shrink-0 overflow-hidden" style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}>
           <div
             ref={tableRef}
             className="flex bg-gray-50 dark:bg-gray-800 shadow-sm"
@@ -335,4 +340,4 @@ export function ResultsTable({ data, error, isLoading, tableName, columnDefs, on
       )}
     </>
   );
-}
+});

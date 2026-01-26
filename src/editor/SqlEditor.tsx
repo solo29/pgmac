@@ -27,7 +27,10 @@ export function SqlEditor({ value, onChange, onRunQuery, connectionId, schemas }
 
   // Cache for column definitions: table_name -> columns
   const columnsCache = useRef<Map<string, ColumnDefinition[]>>(new Map());
-  
+
+  // Cache for parsed tables from current query: Set<"schema.table">
+  const parsedTablesRef = useRef<Set<string>>(new Set());
+
   // Debounce timer for parsing
   const parseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -46,7 +49,7 @@ export function SqlEditor({ value, onChange, onRunQuery, connectionId, schemas }
       onRunQueryRef.current();
     });
   };
-  
+
   // ... (triggerColumnFetch omitted for brevity, logic remains same)
 
   // Effect: Debounced Parse
@@ -64,28 +67,30 @@ export function SqlEditor({ value, onChange, onRunQuery, connectionId, schemas }
 
   // Helper to trigger background fetch
   const triggerColumnFetch = (targetSchema: string, tableName: string) => {
-      const cacheKey = `${targetSchema}.${tableName}`;
-      if (columnsCache.current.has(cacheKey)) {
-          console.log("DEBUG: Cache hit for", cacheKey);
-          return;
-      }
+    const cacheKey = `${targetSchema}.${tableName}`;
+    if (columnsCache.current.has(cacheKey)) {
+      console.log("DEBUG: Cache hit for", cacheKey);
+      return;
+    }
 
-      // console.log("DEBUG: Fetching columns for", cacheKey);
-      invoke<ColumnDefinition[]>("get_columns", {
-          connectionId,
-          schema: targetSchema,
-          table: tableName
-      }).then(cols => {
-          // console.log("DEBUG: Fetched columns for", cacheKey, cols);
-          columnsCache.current.set(cacheKey, cols);
-          
-          // Force re-trigger suggestions if editor is focused?
-          // This ensures that if the user was waiting, suggestions pop up.
-          if (editorRef.current) {
-              // editorRef.current.trigger('keyboard', 'editor.action.triggerSuggest', {});
-          }
-      }).catch(() => {
-           // console.error("DEBUG: Failed bg fetch", err);
+    // console.log("DEBUG: Fetching columns for", cacheKey);
+    invoke<ColumnDefinition[]>("get_columns", {
+      connectionId,
+      schema: targetSchema,
+      table: tableName,
+    })
+      .then((cols) => {
+        // console.log("DEBUG: Fetched columns for", cacheKey, cols);
+        columnsCache.current.set(cacheKey, cols);
+
+        // Force re-trigger suggestions if editor is focused?
+        // This ensures that if the user was waiting, suggestions pop up.
+        if (editorRef.current) {
+          // editorRef.current.trigger('keyboard', 'editor.action.triggerSuggest', {});
+        }
+      })
+      .catch(() => {
+        // console.error("DEBUG: Failed bg fetch", err);
       });
   };
 
@@ -97,39 +102,46 @@ export function SqlEditor({ value, onChange, onRunQuery, connectionId, schemas }
     if (parseTimerRef.current) clearTimeout(parseTimerRef.current);
 
     parseTimerRef.current = setTimeout(() => {
-        // Parse Tables from value
-        // Debug regex
-        // console.log("DEBUG: Parsing SQL...", value);
-        const matches = [...value.matchAll(/\b(?:FROM|JOIN)\s+(?:["']?([a-zA-Z0-9_]+)["']?\.)?["']?([a-zA-Z0-9_]+)["']?/gi)];
-        // console.log("DEBUG: Matches found:", matches.map(m => m[0]));
-        
-        matches.forEach(m => {
-             const schema = m[1] || "public"; 
-             const table = m[2];
-             
-             let finalSchema = schema;
-             // Try to resolve schema if missing
-             if (!m[1] && schemas) {
-                for (const s of schemas) {
-                    if (s.tables?.includes(table)) {
-                        finalSchema = s.name;
-                        break;
-                    }
-                }
-             }
-             
-             // console.log("DEBUG: Context parsing found table:", finalSchema, table);
-             // Pre-fetch columns
-             triggerColumnFetch(finalSchema, table);
-        });
+      // Parse Tables from value
+      // Debug regex
+      // console.log("DEBUG: Parsing SQL...", value);
+      const matches = [...value.matchAll(/\b(?:FROM|JOIN)\s+(?:["']?([a-zA-Z0-9_]+)["']?\.)?["']?([a-zA-Z0-9_]+)["']?/gi)];
+      // console.log("DEBUG: Matches found:", matches.map(m => m[0]));
 
+      const newParsedTables = new Set<string>();
+
+      matches.forEach((m) => {
+        const schema = m[1] || "public";
+        const table = m[2];
+
+        let finalSchema = schema;
+        // Try to resolve schema if missing
+        if (!m[1] && schemas) {
+          for (const s of schemas) {
+            if (s.tables?.includes(table)) {
+              finalSchema = s.name;
+              break;
+            }
+          }
+        }
+
+        // console.log("DEBUG: Context parsing found table:", finalSchema, table);
+
+        // 1. Update parsed tables cache for suggestions
+        newParsedTables.add(`${finalSchema}.${table}`);
+
+        // 2. Pre-fetch columns
+        triggerColumnFetch(finalSchema, table);
+      });
+
+      // Update the ref
+      parsedTablesRef.current = newParsedTables;
     }, 500); // 500ms debounce
 
     return () => {
-        if (parseTimerRef.current) clearTimeout(parseTimerRef.current);
+      if (parseTimerRef.current) clearTimeout(parseTimerRef.current);
     };
   }, [value, connectionId, schemas, isMounted]);
-
 
   // Register Completion Provider
   useEffect(() => {
@@ -145,7 +157,7 @@ export function SqlEditor({ value, onChange, onRunQuery, connectionId, schemas }
       triggerCharacters: [".", " "],
       provideCompletionItems: (model: any, position: any) => {
         // console.log("DEBUG: provideCompletionItems triggered");
-        
+
         const textUntilPosition = model.getValueInRange({
           startLineNumber: position.lineNumber,
           startColumn: 1,
@@ -165,109 +177,93 @@ export function SqlEditor({ value, onChange, onRunQuery, connectionId, schemas }
 
         // 1. Schemas
         if (schemas) {
-            schemas.forEach((s) => {
-                suggestions.push({
-                    label: s.name,
-                    kind: monaco.languages.CompletionItemKind.Module,
-                    insertText: s.name,
-                    range: range,
-                    detail: "Schema",
-                });
+          schemas.forEach((s) => {
+            suggestions.push({
+              label: s.name,
+              kind: monaco.languages.CompletionItemKind.Module,
+              insertText: s.name,
+              range: range,
+              detail: "Schema",
             });
+          });
         }
 
         // 2. Tables (schema.context)
         const matchDot = textUntilPosition.match(/([a-zA-Z0-9_]+)\.$/);
         if (matchDot) {
-            const schemaName = matchDot[1];
-            const schema = schemas?.find(s => s.name === schemaName);
-            if (schema && schema.tables) {
-                 schema.tables.forEach(t => {
-                    suggestions.push({
-                        label: t,
-                        kind: monaco.languages.CompletionItemKind.Class,
-                        insertText: t,
-                        range: range,
-                        detail: "Table",
-                    });
-                 });
-            }
+          const schemaName = matchDot[1];
+          const schema = schemas?.find((s) => s.name === schemaName);
+          if (schema && schema.tables) {
+            schema.tables.forEach((t) => {
+              suggestions.push({
+                label: t,
+                kind: monaco.languages.CompletionItemKind.Class,
+                insertText: t,
+                range: range,
+                detail: "Table",
+              });
+            });
+          }
         }
 
         // 3. Columns (Explicit & Implicit)
-        
+
         // Context 1: Explicit Table Dot?
         const matchTable = textUntilPosition.match(/(?:([a-zA-Z0-9_]+)\.)?([a-zA-Z0-9_]+)\.$/);
-        
+
         // Collect cache keys to look up
         const tablesToSuggest = new Set<string>();
 
         if (matchTable) {
-             // console.log("DEBUG: Explicit table match:", matchTable[0]);
-             const possibleSchema = matchTable[1];
-             const tableName = matchTable[2];
-             
-             let targetSchema = possibleSchema || "public";
-             if (!possibleSchema && schemas) {
-                 for (const s of schemas) {
-                     if (s.tables?.includes(tableName)) {
-                         targetSchema = s.name;
-                         break;
-                     }
-                 }
-             }
-             const key = `${targetSchema}.${tableName}`;
-             tablesToSuggest.add(key);
+          // console.log("DEBUG: Explicit table match:", matchTable[0]);
+          const possibleSchema = matchTable[1];
+          const tableName = matchTable[2];
 
-             // Trigger fetch if not cached (for next time)
-             if (!columnsCache.current.has(key)) {
-                 // console.log("DEBUG: Missing cache for explicit table, triggering fetch:", key);
-                 triggerColumnFetch(targetSchema, tableName);
-             }
-        } 
-        
+          let targetSchema = possibleSchema || "public";
+          if (!possibleSchema && schemas) {
+            for (const s of schemas) {
+              if (s.tables?.includes(tableName)) {
+                targetSchema = s.name;
+                break;
+              }
+            }
+          }
+          const key = `${targetSchema}.${tableName}`;
+          tablesToSuggest.add(key);
+
+          // Trigger fetch if not cached (for next time)
+          if (!columnsCache.current.has(key)) {
+            // console.log("DEBUG: Missing cache for explicit table, triggering fetch:", key);
+            triggerColumnFetch(targetSchema, tableName);
+          }
+        }
+
         // Context 2: Implicit (Identifier typing, no dot)
         if (!matchDot && !matchTable) {
-            // Re-parsing here might be fast enough for "tables in scope" 
-            const fullText = model.getValue();
-            const tableMatches = [...fullText.matchAll(/\b(?:FROM|JOIN)\s+(?:["']?([a-zA-Z0-9_]+)["']?\.)?["']?([a-zA-Z0-9_]+)["']?/gi)];
-            
-            tableMatches.forEach(m => {
-                const schema = m[1] || "public"; 
-                const table = m[2];
-                let sName = schema;
-                if (!m[1] && schemas) {
-                    for (const s of schemas) {
-                        if (s.tables?.includes(table)) {
-                            sName = s.name;
-                            break;
-                        }
-                    }
-                }
-                tablesToSuggest.add(`${sName}.${table}`);
-            });
+          // OPTIMIZATION: Use the cached parsedTablesRef instead of re-parsing
+          parsedTablesRef.current.forEach((t) => tablesToSuggest.add(t));
         }
 
         // Populate suggestions from Cache
         if (tablesToSuggest.size > 0) {
-            // console.log("DEBUG: Suggesting columns for tables:", [...tablesToSuggest]);
-            for (const key of tablesToSuggest) {
-                const cols = columnsCache.current.get(key);
-                if (cols) {
-                    cols.forEach(c => {
-                         suggestions.push({
-                             label: c.name,
-                             kind: monaco.languages.CompletionItemKind.Field,
-                             insertText: c.name,
-                             detail: `${c.data_type} (${key})`,
-                             range: range,
-                             sortText: "0_" + c.name 
-                         });
-                    });
-                } else {
-                    // console.log("DEBUG: No columns in cache for", key);
-                }
+          // console.log("DEBUG: Suggesting columns for tables:", [...tablesToSuggest]);
+          for (const key of tablesToSuggest) {
+            const cols = columnsCache.current.get(key);
+            if (cols) {
+              cols.forEach((c) => {
+                suggestions.push({
+                  label: c.name,
+                  kind: monaco.languages.CompletionItemKind.Field,
+                  insertText: c.name,
+                  detail: `${c.data_type} (${key})`,
+                  range: range,
+                  sortText: "0_" + c.name,
+                });
+              });
+            } else {
+              // console.log("DEBUG: No columns in cache for", key);
             }
+          }
         }
 
         return { suggestions };
