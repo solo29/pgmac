@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { X, Save } from "lucide-react";
+import Editor from "@monaco-editor/react";
 import { ColumnDefinition } from "./types";
 import { generatePreviewSql } from "./helpers";
 
@@ -16,7 +17,9 @@ interface DataModalProps {
 }
 
 export function DataModal({ value, tableName, columnName, originalRow, columns, columnDefs, onClose, onSave, readOnly }: DataModalProps) {
-  const [editValue, setEditValue] = useState(typeof value === "object" && value !== null ? JSON.stringify(value, null, 2) : value === null ? "" : String(value));
+  const [editValue, setEditValue] = useState(
+    typeof value === "object" && value !== null ? JSON.stringify(value, null, 2) : value === null ? "" : String(value),
+  );
   const [isNull, setIsNull] = useState(value === null);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -37,9 +40,7 @@ export function DataModal({ value, tableName, columnName, originalRow, columns, 
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
       <div className="bg-white dark:bg-gray-900 rounded-lg shadow-xl w-full max-w-4xl h-[80vh] flex flex-col border border-gray-200 dark:border-gray-600">
         <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-600">
-          <h3 className="font-semibold text-gray-700 dark:text-gray-200">
-            {readOnly ? "View Cell Details" : "Edit Cell Details"}
-          </h3>
+          <h3 className="font-semibold text-gray-700 dark:text-gray-200">{readOnly ? "View Cell Details" : "Edit Cell Details"}</h3>
           <button onClick={onClose} className="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300">
             <X size={20} />
           </button>
@@ -72,14 +73,25 @@ export function DataModal({ value, tableName, columnName, originalRow, columns, 
                     )}
                   </div>
                   {isJsonMode ? (
-                    <textarea
-                      className="flex-1 w-full p-4 font-mono text-xs bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-indigo-500 resize-none outline-none leading-relaxed disabled:opacity-75 disabled:cursor-not-allowed"
-                      value={isNull ? "" : editValue}
-                      onChange={(e) => setEditValue(e.target.value)}
-                      readOnly={readOnly || isNull}
-                      disabled={readOnly || isNull}
-                      placeholder={isNull ? "NULL" : "(empty)"}
-                    />
+                    <div className="flex-1 w-full border border-gray-300 dark:border-gray-600 rounded-md overflow-hidden">
+                      <Editor
+                        height="100%"
+                        defaultLanguage="json"
+                        theme="vs-dark"
+                        value={isNull ? "" : editValue}
+                        onChange={(val) => setEditValue(val || "")}
+                        options={{
+                          minimap: { enabled: false },
+                          automaticLayout: true,
+                          readOnly: readOnly || isNull,
+                          fontSize: 12,
+                          wordWrap: "on",
+                          formatOnPaste: true,
+                          formatOnType: true,
+                          scrollBeyondLastLine: false,
+                        }}
+                      />
+                    </div>
                   ) : colDef?.enum_values && !readOnly ? (
                     <select
                       className="w-full p-2 font-mono text-xs bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-indigo-500 outline-none leading-relaxed appearance-none disabled:opacity-75 disabled:cursor-not-allowed"

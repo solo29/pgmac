@@ -146,10 +146,8 @@ export function Sidebar({ onSelectTable, onNewConnection }: SidebarProps) {
         isDanger={true}
         isLoading={isDeleting}
       />
-      
-      <div className="p-2 text-[10px] text-gray-400 border-t border-gray-200 dark:border-gray-700 text-center">
-        Build: 7
-      </div>
+
+      <div className="p-2 text-[10px] text-gray-400 border-t border-gray-200 dark:border-gray-700 text-center">Build: 8</div>
     </div>
   );
 }
