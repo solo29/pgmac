@@ -280,7 +280,7 @@ export function Sidebar({ onSelectTable, onNewConnection }: SidebarProps) {
         isLoading={isDeleting}
       />
 
-      <div className="p-2 text-[10px] text-gray-400 border-t border-gray-200 dark:border-gray-700 text-center">Build: 9</div>
+      <div className="p-2 text-[10px] text-gray-400 border-t border-gray-200 dark:border-gray-700 text-center">Build: 10</div>
     </div>
   );
 }
