@@ -152,3 +152,11 @@ pub async fn update_cell(
     };
     driver.update_cell(&schema, &table, &column, col_type, new_value, row_identifiers).await
 }
+
+#[tauri::command]
+pub async fn update_connections_list(
+    app: AppHandle,
+    connections: Vec<SavedConnection>,
+) -> Result<(), String> {
+    storage::save_connections(&app, &connections)
+}

@@ -24,7 +24,8 @@ pub fn run() {
             commands::save_session,
             commands::load_session,
             commands::update_cell,
-            commands::get_columns
+            commands::get_columns,
+            commands::update_connections_list
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

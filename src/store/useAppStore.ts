@@ -41,6 +41,8 @@ interface AppStore {
 
   // Helpers
   connect: (savedId: string) => Promise<string>; // Returns liveId
+  reorderConnections: (newOrder: SavedConnection[]) => Promise<void>;
+  renameConnection: (id: string, newName: string) => Promise<void>;
 }
 
 export const useAppStore = create<AppStore>((set, get) => ({
@@ -212,6 +214,60 @@ export const useAppStore = create<AppStore>((set, get) => ({
           return { connections: newConns };
         });
       }
+    }
+  },
+
+  reorderConnections: async (newOrder) => {
+    // Optimistic update
+    set((state) => {
+      const currentMap = new Map(state.connections.map((c) => [c.data.id, c]));
+
+      const newConnections = newOrder.map((s) => {
+        const existing = currentMap.get(s.id);
+        if (existing) {
+          return existing;
+        }
+        return {
+          data: s,
+          isOpen: false,
+          liveConnectionId: null,
+          schemas: null,
+          isLoading: false,
+        };
+      });
+      return { connections: newConnections };
+    });
+
+    try {
+      await invoke("update_connections_list", { connections: newOrder });
+    } catch (err) {
+      console.error("Failed to reorder connections", err);
+      get().loadConnections();
+    }
+  },
+
+  renameConnection: async (id, newName) => {
+    const { connections } = get();
+    const nodeIndex = connections.findIndex((c) => c.data.id === id);
+    if (nodeIndex === -1) return;
+
+    // Optimistic
+    set((state) => {
+      const newConns = [...state.connections];
+      newConns[nodeIndex] = {
+        ...newConns[nodeIndex],
+        data: { ...newConns[nodeIndex].data, name: newName },
+      };
+      return { connections: newConns };
+    });
+
+    try {
+      const updatedConnection = connections[nodeIndex].data;
+      updatedConnection.name = newName;
+      await invoke("save_connection", { connection: updatedConnection });
+    } catch (err) {
+      console.error("Failed to rename connection", err);
+      get().loadConnections();
     }
   },
 }));
