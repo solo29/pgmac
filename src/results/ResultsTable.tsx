@@ -216,11 +216,14 @@ export const ResultsTable = memo(function ResultsTable({
     // If it's a non-returning query (empty columns), we show affected rows.
     // Even if affected_rows is 0 (e.g. UPDATE ... WHERE 1=0).
     if (data && data.columns.length === 0) {
-      return (
-        <div className="flex h-full items-center justify-center text-gray-500 dark:text-gray-400">
-          Query executed successfully. Affected rows: {data.affected_rows}
-        </div>
-      );
+      const isSelect = data.query_type === "SELECT" || data.query_type === "WITH" || data.query_type === "VALUES";
+      if (!isSelect) {
+        return (
+          <div className="flex h-full items-center justify-center text-gray-500 dark:text-gray-400">
+            Query executed successfully. Affected rows: {data.affected_rows}
+          </div>
+        );
+      }
     }
     return <div className="flex h-full items-center justify-center text-gray-500 dark:text-gray-400">No results to display</div>;
   }

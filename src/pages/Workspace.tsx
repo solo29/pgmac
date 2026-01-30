@@ -13,6 +13,7 @@ interface QueryResult {
   columns: string[];
   rows: any[][];
   affected_rows: number;
+  query_type: string;
 }
 
 interface ColumnDefinition {

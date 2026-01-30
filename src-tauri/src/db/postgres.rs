@@ -45,6 +45,14 @@ impl DatabaseDriver for PostgresDriver {
         use futures::StreamExt;
         use sqlx::Either;
 
+        // Simple inference of query type
+        let trimmed_sql = sql.trim();
+        let query_type = trimmed_sql
+            .split_whitespace()
+            .next()
+            .map(|s| s.to_uppercase())
+            .unwrap_or_else(|| "UNKNOWN".to_string());
+
         let mut rows = Vec::new();
         let mut affected_rows = 0;
         let mut columns = Vec::new();
@@ -75,6 +83,7 @@ impl DatabaseDriver for PostgresDriver {
             columns,
             rows,
             affected_rows,
+            query_type,
         })
     }
 
