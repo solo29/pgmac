@@ -1,23 +1,8 @@
 import Editor, { OnMount } from "@monaco-editor/react";
 import { useEffect, useRef, useState } from "react";
-import { SchemaNode } from "../store/useAppStore";
+
 import { invoke } from "@tauri-apps/api/core";
-
-interface SqlEditorProps {
-  value: string;
-  onChange: (value: string | undefined) => void;
-  onRunQuery: () => void;
-  connectionId?: string | null;
-  schemas?: SchemaNode[] | null;
-}
-
-interface ColumnDefinition {
-  name: string;
-  data_type: string;
-  is_pk: boolean;
-  is_unique: boolean;
-  enum_values?: string[] | null;
-}
+import { ColumnDefinition, SqlEditorProps } from "./type";
 
 export function SqlEditor({ value, onChange, onRunQuery, connectionId, schemas }: SqlEditorProps) {
   const editorRef = useRef<any>(null);
