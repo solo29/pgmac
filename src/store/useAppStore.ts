@@ -38,6 +38,7 @@ interface AppStore {
   toggleConnection: (savedId: string) => Promise<void>;
   toggleSchema: (savedId: string, schemaName: string) => Promise<void>;
   setGlobalConnectionId: (id: string | null) => void;
+  refreshSchemas: (savedId: string) => Promise<void>;
 
   // Helpers
   connect: (savedId: string) => Promise<string>; // Returns liveId
@@ -214,6 +215,58 @@ export const useAppStore = create<AppStore>((set, get) => ({
           return { connections: newConns };
         });
       }
+    }
+  },
+
+  refreshSchemas: async (savedId) => {
+    const { connections } = get();
+    const nodeIndex = connections.findIndex((c) => c.data.id === savedId);
+    if (nodeIndex === -1) return;
+
+    const node = connections[nodeIndex];
+    if (!node.liveConnectionId) return; // Not connected yet
+
+    // Set loading state
+    set((state) => {
+      const newConns = [...state.connections];
+      newConns[nodeIndex] = { ...newConns[nodeIndex], isLoading: true };
+      return { connections: newConns };
+    });
+
+    try {
+      // Re-fetch schemas
+      const schemas = await invoke<string[]>("get_schemas", { connectionId: node.liveConnectionId });
+
+      // For each schema that was previously open, re-fetch tables
+      const oldSchemas = node.schemas || [];
+      const newSchemas = await Promise.all(
+        schemas.map(async (name) => {
+          const oldSchema = oldSchemas.find((s) => s.name === name);
+          if (oldSchema?.isOpen) {
+            // Re-fetch tables for open schemas
+            const tables = await invoke<string[]>("get_tables", { connectionId: node.liveConnectionId, schema: name });
+            return { name, tables, isOpen: true };
+          }
+          return { name, tables: null, isOpen: false };
+        }),
+      );
+
+      set((state) => {
+        const newConns = [...state.connections];
+        newConns[nodeIndex] = {
+          ...newConns[nodeIndex],
+          isLoading: false,
+          schemas: newSchemas,
+        };
+        return { connections: newConns };
+      });
+    } catch (err) {
+      console.error("Failed to refresh schemas", err);
+      set((state) => {
+        const newConns = [...state.connections];
+        newConns[nodeIndex] = { ...newConns[nodeIndex], isLoading: false };
+        return { connections: newConns };
+      });
     }
   },
 

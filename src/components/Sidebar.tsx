@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { ChevronRight, ChevronDown, Table as TableIcon, Plus, Trash2, Loader2, GripVertical, Pencil } from "lucide-react";
+import { ChevronRight, ChevronDown, Table as TableIcon, Plus, Trash2, Loader2, GripVertical, Pencil, RefreshCw } from "lucide-react";
 import clsx from "clsx";
 import logo from "../assets/logo.jpg";
 import { ConfirmModal } from "./ConfirmModal";
@@ -23,6 +23,7 @@ interface SortableConnectionItemProps {
   onToggle: (id: string) => void;
   onDelete: (e: React.MouseEvent, id: string) => void;
   onRename: (id: string, newName: string) => void;
+  onRefresh: (id: string) => void;
   onToggleSchema: (id: string, schema: string) => void;
   onTableClick: (liveId: string, savedId: string, schema: string, table: string) => void;
 }
@@ -34,6 +35,7 @@ function SortableConnectionItem({
   onToggle,
   onDelete,
   onRename,
+  onRefresh,
   onToggleSchema,
   onTableClick,
 }: SortableConnectionItemProps) {
@@ -120,7 +122,19 @@ function SortableConnectionItem({
               <Pencil size={12} />
             </button>
           )}
-          <button onClick={(e) => onDelete(e, conn.data.id)} className="text-gray-400 hover:text-red-500 p-1">
+          {conn.liveConnectionId && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onRefresh(conn.data.id);
+              }}
+              className="text-gray-400 hover:text-green-500 p-1"
+              title="Refresh schemas"
+            >
+              <RefreshCw size={12} />
+            </button>
+          )}
+          <button onClick={(e) => onDelete(e, conn.data.id)} className="text-gray-400 hover:text-red-500 p-1" title="Delete">
             <Trash2 size={14} />
           </button>
         </div>
@@ -174,7 +188,8 @@ function SortableConnectionItem({
 }
 
 export function Sidebar({ onSelectTable, onNewConnection }: SidebarProps) {
-  const { connections, activeConnectionId, loadConnections, toggleConnection, toggleSchema, reorderConnections, renameConnection } = useAppStore();
+  const { connections, activeConnectionId, loadConnections, toggleConnection, toggleSchema, reorderConnections, renameConnection, refreshSchemas } =
+    useAppStore();
   const [selectedTable, setSelectedTable] = useState<string | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -261,6 +276,7 @@ export function Sidebar({ onSelectTable, onNewConnection }: SidebarProps) {
                 onToggle={toggleConnection}
                 onDelete={handleDeleteClick}
                 onRename={renameConnection}
+                onRefresh={refreshSchemas}
                 onToggleSchema={toggleSchema}
                 onTableClick={handleTableClick}
               />
