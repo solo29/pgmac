@@ -2,7 +2,7 @@ use async_trait::async_trait;
 use sqlx::postgres::{PgPoolOptions, PgRow};
 use sqlx::{Column, Row, TypeInfo};
 use std::time::Duration;
-use chrono::{DateTime, Utc, NaiveDateTime, NaiveDate};
+use chrono::{DateTime, Utc, NaiveDateTime, NaiveDate, NaiveTime};
 
 use crate::db::DatabaseDriver;
 use crate::models::{DbConfig, QueryResult};
@@ -283,11 +283,23 @@ fn map_postgres_value(row: &PgRow, index: usize) -> serde_json::Value {
             let v: Option<bool> = row.try_get(index).ok();
             serde_json::json!(v)
         },
-        "INT2" | "INT4" | "INT8" => {
+        "INT2" => {
+            let v: Option<i16> = row.try_get(index).ok();
+            serde_json::json!(v)
+        },
+        "INT4" => {
+            let v: Option<i32> = row.try_get(index).ok();
+            serde_json::json!(v)
+        },
+        "INT8" => {
             let v: Option<i64> = row.try_get(index).ok();
             serde_json::json!(v)
         },
-        "FLOAT4" | "FLOAT8" => {
+        "FLOAT4" => {
+            let v: Option<f32> = row.try_get(index).ok();
+            serde_json::json!(v)
+        },
+        "FLOAT8" => {
             let v: Option<f64> = row.try_get(index).ok();
             serde_json::json!(v)
         },
@@ -317,6 +329,39 @@ fn map_postgres_value(row: &PgRow, index: usize) -> serde_json::Value {
              let v: Option<NaiveDate> = row.try_get(index).ok();
              if let Some(d) = v {
                  serde_json::json!(d.to_string())
+             } else {
+                 serde_json::Value::Null
+             }
+        },
+        "TIME" | "TIMETZ" => {
+             let v: Option<NaiveTime> = row.try_get(index).ok();
+             if let Some(t) = v {
+                 serde_json::json!(t.format("%H:%M:%S%.f").to_string())
+             } else {
+                 serde_json::Value::Null
+             }
+        },
+        "INET" | "CIDR" => {
+             let v: Option<ipnetwork::IpNetwork> = row.try_get(index).ok();
+             if let Some(ip) = v {
+                 serde_json::json!(ip.to_string())
+             } else {
+                 serde_json::Value::Null
+             }
+        },
+        "MACADDR" | "MACADDR8" => {
+             let v: Option<mac_address::MacAddress> = row.try_get(index).ok();
+             if let Some(mac) = v {
+                 serde_json::json!(mac.to_string())
+             } else {
+                 serde_json::Value::Null
+             }
+        },
+        "BYTEA" => {
+             // Display binary data as hex string with \x prefix (PostgreSQL style)
+             if let Ok(bytes) = value_ref.as_bytes() {
+                 let hex: String = bytes.iter().map(|b| format!("{:02x}", b)).collect();
+                 serde_json::Value::String(format!("\\x{}", hex))
              } else {
                  serde_json::Value::Null
              }
