@@ -49,13 +49,13 @@ export function generatePreviewSql(
 
   const [schema, table] = tableName.split(".");
   let sql = `UPDATE "${schema}"."${table}" SET "${columnName}" = `;
-  
+
   if (newValue === null) {
     sql += "NULL";
   } else {
     sql += `'${newValue.replace(/'/g, "''")}'`;
   }
-  
+
   sql += " WHERE ";
 
   let pkColNames = new Set(columnDefs.filter((c) => c.is_pk).map((c) => c.name));
@@ -105,4 +105,55 @@ export function storeColumnWidths(tableKey: string, widths: Record<string, numbe
   } catch {
     // Ignore storage errors
   }
+}
+
+// Date/Time formatting helpers for DataModal
+
+// Helper to detect date/time type and return appropriate input type
+export function getDateTimeInputType(dataType: string | undefined): "date" | "datetime-local" | "time" | null {
+  if (!dataType) return null;
+  const dt = dataType.toLowerCase();
+  if (dt === "date") return "date";
+  if (dt.includes("timestamp")) return "datetime-local";
+  if (dt.startsWith("time")) return "time";
+  return null;
+}
+
+// Format value for date input (YYYY-MM-DD)
+// Avoid timezone issues by parsing manually
+export function formatDateValue(val: string): string {
+  if (!val) return "";
+  // If already in YYYY-MM-DD format, return as-is
+  if (/^\d{4}-\d{2}-\d{2}$/.test(val)) return val;
+  // Try to extract date portion from various formats
+  const match = val.match(/^(\d{4}-\d{2}-\d{2})/);
+  if (match) return match[1];
+  // Fallback: try Date parsing with local timezone
+  const date = new Date(val);
+  if (isNaN(date.getTime())) return val;
+  const pad = (n: number) => n.toString().padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
+
+// Format value for datetime-local input (YYYY-MM-DDTHH:mm:ss)
+// Use local time to avoid timezone shifts
+export function formatDateTimeValue(val: string): string {
+  if (!val) return "";
+  // If already in datetime-local format
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(val)) return val;
+  // Handle "YYYY-MM-DD HH:mm:ss" PostgreSQL format
+  const pgMatch = val.match(/^(\d{4}-\d{2}-\d{2})\s+(\d{2}:\d{2}:\d{2})/);
+  if (pgMatch) return `${pgMatch[1]}T${pgMatch[2]}`;
+  // Fallback: try Date parsing with local time
+  const date = new Date(val);
+  if (isNaN(date.getTime())) return val;
+  const pad = (n: number) => n.toString().padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+}
+
+// Format value for time input (HH:mm:ss)
+export function formatTimeValue(val: string): string {
+  if (!val) return "";
+  const match = val.match(/^(\d{2}:\d{2}:\d{2})/);
+  return match ? match[1] : val;
 }
