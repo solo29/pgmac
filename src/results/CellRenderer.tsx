@@ -91,7 +91,7 @@ function CellRenderer({ value, onZoom }: CellRendererProps) {
   return (
     <div className="group flex items-center justify-between w-full h-full min-h-[1.5rem]">
       <div
-        className="text-xs leading-4 whitespace-nowrap overflow-x-hidden hover:overflow-x-auto no-scrollbar max-w-[250px] flex-1"
+        className="text-xs leading-4 whitespace-nowrap overflow-x-hidden hover:overflow-x-auto no-scrollbar flex-1"
         title={strValue.length > 100 ? strValue.substring(0, 500) + "..." : strValue}
       >
         {strValue}
