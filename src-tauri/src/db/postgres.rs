@@ -31,7 +31,11 @@ impl DatabaseDriver for PostgresDriver {
 
         let pool = PgPoolOptions::new()
             .max_connections(5)
-            .acquire_timeout(Duration::from_secs(3))
+            .min_connections(0)
+            .acquire_timeout(Duration::from_secs(30))
+            .idle_timeout(Duration::from_secs(120))
+            .max_lifetime(Duration::from_secs(600))
+            .test_before_acquire(true)
             .connect(&connection_string)
             .await
             .map_err(|e| e.to_string())?;
